@@ -1,4 +1,6 @@
 import java.awt.Color;
+import java.awt.Point;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -9,9 +11,9 @@ import javax.imageio.ImageIO;
 
 public class scribbleType {
 	
-	private static final double TEMPLATE_BORDER = 0.08;
-	private static final int COLOR_THRESHOLD = 210; //higher means responds to lighter colors
-	private static final double PERCENTAGE_THRESHOLD = 0.03; //higher means it will need more dark pixels to stop trimming letters
+	private static final double TEMPLATE_BORDER = 0.15;
+	private static final int COLOR_THRESHOLD = 100; //higher means responds to lighter colors
+	private static final double PERCENTAGE_THRESHOLD = 0.001; //higher means it will need more dark pixels to stop trimming letters
 	private static final int KERNING = 5;
 	private static final int SPACE_LENGTH = 30;
 	
@@ -20,16 +22,20 @@ public class scribbleType {
 		Scanner scan = new Scanner(System.in);
 		System.out.print("Enter file name: ");
 		template = ImageIO.read(new File(scan.next()));
+		blackAndWhite(template, COLOR_THRESHOLD);
+		BufferedImage croppedTemplate = cropImage((rotateImage(template, COLOR_THRESHOLD)), COLOR_THRESHOLD);
+		ImageIO.write(rotateImage(template, COLOR_THRESHOLD), "jpg", new File("rotated.jpg"));
+		ImageIO.write(croppedTemplate, "jpg", new File("cropped.jpg"));
 		
-		BufferedImage[][] letters = splitLetters(template);
+		BufferedImage[][] letters = splitLetters(croppedTemplate);
 		
-		/*for (int i = 0; i < letters.length; i++) {
+	/*	for (int i = 0; i < letters.length; i++) {
 			for (int j = 0; j < letters[i].length; j++) {
 				String filename = ("letter" + i + "_" + j + ".jpg");
 				ImageIO.write(letters[i][j], "jpg", new File(filename));
 			}
-		}*/
-		
+		}
+	*/	
 		System.out.print("Enter width of canvas in pixels: ");
 		int canvasWidth = scan.nextInt();
 		System.out.print("Enter height of canvas in lines: ");
@@ -137,6 +143,84 @@ public class scribbleType {
 		}
 		//ImageIO.write(letter.getSubimage(left, 0, right - left, letter.getHeight()), "jpg", new File("letter" + right + "_" + left + ".jpg"));
 		return letter.getSubimage(left, 0, right - left, letter.getHeight());
+	}
+	
+	public static BufferedImage rotateImage(BufferedImage template, int threshold) {
+		Point leftCorner = new Point(template.getWidth() - 1, 0);
+		Point rightCorner = new Point(0, 0);
+		for (int j = 0; j < template.getHeight(); j++) {
+			for (int i = 0; i < template.getWidth(); i++) {
+				Color color = new Color(template.getRGB(i, j));
+				if ((color.getRed() + color.getGreen() + color.getBlue()) / 3 < threshold) {
+					if (i > rightCorner.x) {
+						rightCorner.setLocation(i, j);
+					}
+					if (i < leftCorner.x) {
+						leftCorner.setLocation(i, j);
+					}
+					break; 
+				}
+			}
+		}
+		Point transformVector = new Point(rightCorner.x - leftCorner.x, 
+				leftCorner.y - rightCorner.y);
+		AffineTransform transform = new AffineTransform();
+		transform.rotate(transformVector.x, transformVector.y, template.getWidth() / 2, template.getHeight() / 2);
+		BufferedImage rotatedTemplate = new BufferedImage(template.getWidth(), template.getHeight(), template.getType());
+		rotatedTemplate.createGraphics().setPaint(Color.WHITE);
+		rotatedTemplate.createGraphics().fillRect(0, 0, template.getWidth(), template.getHeight());
+		rotatedTemplate.createGraphics().drawImage(template, transform, null);
+		return rotatedTemplate;
+	}
+	
+	public static BufferedImage cropImage(BufferedImage template, int threshold) {
+		int topEdge = 0;
+		int bottomEdge = template.getHeight();
+		int leftEdge = 0;
+		int rightEdge = template.getWidth();
+		for (int i = 0; i < template.getWidth(); i++) {
+			Color color = new Color(template.getRGB(i, template.getHeight()/2));
+			if ((color.getRed() + color.getGreen() + color.getBlue()) / 3 < threshold) {
+				leftEdge = i;
+				break;
+			}
+		}
+		for (int i = template.getWidth() - 1; i >= 0; i--) {
+			Color color = new Color(template.getRGB(i, template.getHeight()/2));
+			if ((color.getRed() + color.getGreen() + color.getBlue()) / 3 < threshold) {
+				rightEdge = i;
+				break;
+			}
+		}
+		for (int j = 0; j < template.getHeight(); j++) {
+			Color color = new Color(template.getRGB(template.getWidth()/2, j));
+			if ((color.getRed() + color.getGreen() + color.getBlue()) / 3 < threshold) {
+				topEdge = j;
+				break;
+			}
+		}
+		for (int j = template.getHeight() - 1; j >= 0; j--) {
+			Color color = new Color(template.getRGB(template.getWidth()/2, j));
+			if ((color.getRed() + color.getGreen() + color.getBlue()) / 3 < threshold) {
+				bottomEdge = j;
+				break;
+			}
+		}
+		return template.getSubimage(leftEdge, topEdge, rightEdge - leftEdge, bottomEdge - topEdge);
+	}
+	
+	public static void blackAndWhite(BufferedImage image, int threshold) {
+		for (int i = 0; i < image.getWidth(); i++) {
+			for (int j = 0; j < image.getHeight(); j++) {
+				Color color = new Color(image.getRGB(i, j));
+				if ((color.getRed() + color.getGreen() + color.getBlue()) / 3 < threshold) {
+					image.setRGB(i, j, Color.BLACK.getRGB());
+				}
+				else {
+					image.setRGB(i, j, Color.white.getRGB());
+				}
+			}
+		}
 	}
 	
 }
